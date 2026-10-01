@@ -46,7 +46,7 @@ class FLClient:
                 images, labels = images.to(self.device), labels.to(self.device)
                 
                 optimizer.zero_grad()
-                outputs = model(images)
+                outputs = self.model(images)
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 optimizer.step()
