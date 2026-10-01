@@ -15,8 +15,12 @@ class FLClient:
         self.lr = lr
         self.device = device
         
-        self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=True, 
-                                     num_workers=0, pin_memory=True if device == 'cuda' else False)
+        # Pre-load all data into GPU memory to eliminate data-loading overhead during training
+        temp_loader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=True)
+        self.batches = []
+        for images, labels in temp_loader:
+            self.batches.append((images.to(self.device), labels.to(self.device)))
+            
         self.criterion = nn.CrossEntropyLoss()
         self.model = None
 
@@ -42,8 +46,7 @@ class FLClient:
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.5)
         
         for epoch in range(self.local_epochs):
-            for batch_idx, (images, labels) in enumerate(self.dataloader):
-                images, labels = images.to(self.device), labels.to(self.device)
+            for images, labels in self.batches:
                 
                 optimizer.zero_grad()
                 outputs = self.model(images)
