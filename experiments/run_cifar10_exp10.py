@@ -36,7 +36,7 @@ def run_exp10_cifar10():
     def run_scenario(noise_level):
         server = FLServer(get_model('cifar10'), device=device)
         clients = [FLClient(k, client_datasets[k], batch_size=32, local_epochs=1, lr=0.01, device=device) for k in range(num_clients)]
-        test_loader = DataLoader(test_data, batch_size=500, num_workers=2, pin_memory=True)
+        test_loader = DataLoader(test_data, batch_size=500, num_workers=0, pin_memory=True)
         
         acc_history = [server.evaluate(test_loader)[0]]
         

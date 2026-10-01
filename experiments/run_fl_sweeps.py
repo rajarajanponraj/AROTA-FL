@@ -38,7 +38,7 @@ def run_fl_simulation(train_dataset, test_dataset, num_clients, num_rounds, nois
         clients.append(FLClient(k, client_datasets[k], batch_size=64, local_epochs=1, lr=0.01, device=device))
         
     # Larger batch size for faster evaluation
-    test_loader = DataLoader(test_dataset, batch_size=500, num_workers=2, pin_memory=True)
+    test_loader = DataLoader(test_dataset, batch_size=500, num_workers=0, pin_memory=True)
     
     acc_history = []
     

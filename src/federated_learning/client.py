@@ -16,7 +16,7 @@ class FLClient:
         self.device = device
         
         self.dataloader = DataLoader(self.dataset, batch_size=self.batch_size, shuffle=True, 
-                                     num_workers=2, pin_memory=True if device == 'cuda' else False)
+                                     num_workers=0, pin_memory=True if device == 'cuda' else False)
         self.criterion = nn.CrossEntropyLoss()
         self.model = None
 
