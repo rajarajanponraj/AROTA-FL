@@ -1,0 +1,28 @@
+# Project Milestones
+
+- [x] Mathematical model
+- [x] Channel model
+- [x] Imperfect CSI
+- [x] Active RIS
+- [x] RIS noise
+- [ ] AirComp signal
+- [ ] Analytical MSE
+- [ ] Empirical MSE validation
+- [ ] No-RIS baseline
+- [ ] Passive-RIS baseline
+- [ ] Fixed active-RIS baseline
+- [ ] MSE-min baseline
+- [ ] FL simulator
+- [ ] AirComp-FL integration
+- [ ] Convergence-aware objective
+- [ ] Proposed optimization
+- [ ] CSI experiments
+- [ ] SNR experiments
+- [ ] RIS-size experiments
+- [ ] Client experiments
+- [ ] IID experiment
+- [ ] Non-IID experiment
+- [ ] Monte Carlo validation
+- [ ] Figures
+- [ ] Tables
+- [ ] Research summary

@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest
+.pytest_cache/
+
+# Datasets
+data/
+
+# Results & Logs
+results/
+*.log
+
+# Colab scratch
+AROTA-FL.zip
+
+# Virtual environments
+venv/
+.env
