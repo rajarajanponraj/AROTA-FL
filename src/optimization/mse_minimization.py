@@ -3,7 +3,7 @@ from scipy.optimize import minimize
 from src.aircomp.beamforming import compute_zf_scaling
 from src.aircomp.mse import compute_analytical_mse
 
-def optimize_mse_baseline(h_direct, G_H, h_ris, alphas, P_max, sigma_R, sigma_0, a_max, num_restarts=3, random_seed=None):
+def optimize_mse_baseline(h_direct, G_H, h_ris, alphas, P_max, sigma_R, sigma_0, a_max, P_RIS_max=2.0, num_restarts=3, random_seed=None):
     """
     Naively optimize the instantaneous MSE by finding the best (a, Theta) 
     using a numerical optimizer, assuming perfect/estimated CSI.
@@ -47,7 +47,14 @@ def optimize_mse_baseline(h_direct, G_H, h_ris, alphas, P_max, sigma_R, sigma_0,
         mse = (c**2) * (sigma_R**2 * cascaded_gain + sigma_0**2)
         return mse
         
+    def ris_power_constraint(x):
+        a = x[0]
+        incident_power = np.sum(P_max * np.abs(h_ris)**2) 
+        output_power = (a**2) * incident_power + (a**2) * num_antennas * (sigma_R**2)
+        return P_RIS_max - output_power
+
     bounds = [(1.0, a_max)] + [(0, 2*np.pi)] * num_antennas
+    constraints = [{'type': 'ineq', 'fun': ris_power_constraint}]
     
     best_mse = float('inf')
     best_x = None
@@ -58,7 +65,7 @@ def optimize_mse_baseline(h_direct, G_H, h_ris, alphas, P_max, sigma_R, sigma_0,
         x0[0] = np.random.uniform(1.0, a_max)
         x0[1:] = np.random.uniform(0, 2*np.pi, num_antennas)
         
-        res = minimize(cost_fn, x0, bounds=bounds, method='L-BFGS-B')
+        res = minimize(cost_fn, x0, bounds=bounds, constraints=constraints, method='SLSQP')
         
         if res.fun < best_mse:
             best_mse = res.fun

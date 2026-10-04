@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.federated_learning.model import get_model
@@ -20,8 +20,6 @@ def load_mnist_full():
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
     train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
     test_dataset = datasets.MNIST('./data', train=False, download=True, transform=transform)
-    
-    # Use full dataset for publication
     return train_dataset, test_dataset
 
 def generate_channel(K, N=32):
@@ -33,14 +31,16 @@ def generate_channel(K, N=32):
     pl_ris_users = [compute_path_loss(d_RIS_users[k])[1] for k in range(K)]
     pl_ris_ap = compute_path_loss(d_RIS_AP)[1]
     
-    h_direct = np.array([generate_rician_channel(1, 1, k_factor_linear=10.0)[0,0] * np.sqrt(pl_direct[k]) for k in range(K)])
-    h_ris = np.array([generate_rician_channel(N, 1, k_factor_linear=10.0)[0] * np.sqrt(pl_ris_users[k]) for k in range(K)])
-    G_H = generate_rician_channel(N, 1, k_factor_linear=10.0)[0].reshape(1, N) * np.sqrt(pl_ris_ap)
+    h_direct_true = np.array([generate_rician_channel(1, 1, k_factor_linear=10.0)[0,0] * np.sqrt(pl_direct[k]) for k in range(K)])
+    h_ris_true = np.array([generate_rician_channel(N, 1, k_factor_linear=10.0)[0] * np.sqrt(pl_ris_users[k]) for k in range(K)])
+    G_H_true = generate_rician_channel(N, 1, k_factor_linear=10.0)[0].reshape(1, N) * np.sqrt(pl_ris_ap)
     
-    return h_direct, G_H, h_ris
+    return h_direct_true, G_H_true, h_ris_true
 
-def run_fl_simulation(train_dataset, test_dataset, num_clients, num_rounds, method="ideal", iid=True, label=""):
-    print(f"Running FL Simulation: {label} (Method: {method})")
+def run_fl_simulation_seed(train_dataset, test_dataset, num_clients, num_rounds, method, iid, seed):
+    # Set identical random seeds for identical data partitions and network initializations
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     
     if iid:
         client_datasets = partition_dataset_iid(train_dataset, num_clients)
@@ -53,83 +53,91 @@ def run_fl_simulation(train_dataset, test_dataset, num_clients, num_rounds, meth
     
     clients = []
     for k in range(num_clients):
-        # Batch size 64 is standard for full FL simulations
         clients.append(FLClient(k, client_datasets[k], batch_size=64, local_epochs=1, lr=0.01, device=device))
         
-    # Larger batch size for faster evaluation
     test_loader = DataLoader(test_dataset, batch_size=500, num_workers=0, pin_memory=True)
     
-    # Pre-generate Channel & Optimization exactly once to simulate a block-fading environment
-    # In a fully dynamic channel, this would be computed per-round.
     N = 32
     alphas = np.ones(num_clients) / num_clients
     P_max = 10 ** (10 / 10) / 1000
+    P_RIS_max = 2.0
     sigma_0, sigma_R, sigma_e = 1e-12, 1e-11, 0.1
     a_max = 15.0
     
-    h_direct, G_H, h_ris = generate_channel(num_clients, N)
+    # 1. True Channels
+    h_direct_true, G_H_true, h_ris_true = generate_channel(num_clients, N)
+    
+    # 2. Estimated Channels (CSI Uncertainty)
+    h_direct_hat = h_direct_true + (np.random.randn(*h_direct_true.shape) + 1j*np.random.randn(*h_direct_true.shape)) * np.sqrt(sigma_e**2 / 2)
+    G_H_hat = G_H_true + (np.random.randn(*G_H_true.shape) + 1j*np.random.randn(*G_H_true.shape)) * np.sqrt(sigma_e**2 / 2)
+    h_ris_hat = h_ris_true + (np.random.randn(*h_ris_true.shape) + 1j*np.random.randn(*h_ris_true.shape)) * np.sqrt(sigma_e**2 / 2)
     
     if method == "conv_aware":
-        Theta, b, c, _ = optimize_convergence_aware(h_direct, G_H, h_ris, alphas, P_max, sigma_R, sigma_0, sigma_e, a_max, num_restarts=1)
-        h_eff = h_direct + np.squeeze(G_H @ Theta @ h_ris.T)
+        Theta, b, c, _ = optimize_convergence_aware(h_direct_hat, G_H_hat, h_ris_hat, alphas, P_max, sigma_R, sigma_0, sigma_e, a_max, P_RIS_max=P_RIS_max, num_restarts=1)
+        h_eff_true = h_direct_true + np.squeeze(G_H_true @ Theta @ h_ris_true.T)
     elif method == "mse_min":
-        Theta, b, c, _ = optimize_mse_baseline(h_direct, G_H, h_ris, alphas, P_max, sigma_R, sigma_0, a_max, num_restarts=1)
-        h_eff = h_direct + np.squeeze(G_H @ Theta @ h_ris.T)
+        Theta, b, c, _ = optimize_mse_baseline(h_direct_hat, G_H_hat, h_ris_hat, alphas, P_max, sigma_R, sigma_0, a_max, P_RIS_max=P_RIS_max, num_restarts=1)
+        h_eff_true = h_direct_true + np.squeeze(G_H_true @ Theta @ h_ris_true.T)
     else:
-        Theta, b, c, h_eff = None, None, None, None
+        Theta, b, c, h_eff_true = None, None, None, None
         
-    acc_history = []
+    acc_history = [server.evaluate(test_loader)[0]]
     
-    # Pre-evaluate
-    acc, _ = server.evaluate(test_loader)
-    acc_history.append(acc)
-    
-    for round_idx in tqdm(range(num_rounds)):
-        updates = []
-        for client in clients:
-            update = client.train(server.global_model)
-            updates.append(update)
+    for _ in range(num_rounds):
+        updates = [client.train(server.global_model) for client in clients]
             
         if method == "ideal":
             noisy_agg = np.mean(updates, axis=0)
         else:
-            # Here we actually demonstrate the Convergence-Aware Active RIS in the FL loop!
-            # The updates are physically aggregated over-the-air.
-            noisy_agg = aggregate_updates_aircomp(updates, h_eff, b, c, G_H, Theta, sigma_R, sigma_0)
+            # Physical Layer Simulation: Pass True channel, but Optimization used Hat channels!
+            noisy_agg = aggregate_updates_aircomp(updates, h_eff_true, b, c, G_H_true, Theta, sigma_R, sigma_0)
             
         server.update_model(noisy_agg)
-        
-        acc, _ = server.evaluate(test_loader)
-        acc_history.append(acc)
+        acc_history.append(server.evaluate(test_loader)[0])
         
     return acc_history
 
+def run_fl_simulation_multiseed(train_data, test_data, num_clients, num_rounds, method, iid, label, num_seeds=3):
+    print(f"Running: {label} (Method: {method}) over {num_seeds} seeds")
+    acc_seeds = []
+    for seed in tqdm(range(num_seeds), desc="Seeds"):
+        acc = run_fl_simulation_seed(train_data, test_data, num_clients, num_rounds, method, iid, seed)
+        acc_seeds.append(acc)
+        
+    acc_mean = np.mean(acc_seeds, axis=0)
+    acc_std = np.std(acc_seeds, axis=0)
+    return acc_mean, acc_std
+
 def run_exp7_8_9():
-    num_clients = 20 # 20 clients is standard for wireless FL papers
-    num_rounds = 100 # 100 rounds to show full convergence
+    num_clients = 20
+    num_rounds = 60
+    num_seeds = 3
     
     train_data, test_data = load_mnist_full()
     
-    # 1. Baseline IID vs Non-IID (No noise)
-    acc_iid = run_fl_simulation(train_data, test_data, num_clients, num_rounds, method="ideal", iid=True, label="IID (Perfect Channel)")
-    acc_non_iid = run_fl_simulation(train_data, test_data, num_clients, num_rounds, method="ideal", iid=False, label="Non-IID (Perfect Channel)")
-    
-    # 2. Noisy channel (Actual AirComp with Convergence-Aware vs MSE-Min)
-    acc_mse_min = run_fl_simulation(train_data, test_data, num_clients, num_rounds, method="mse_min", iid=False, label="Non-IID (Active RIS - MSE Min)")
-    acc_conv_aware = run_fl_simulation(train_data, test_data, num_clients, num_rounds, method="conv_aware", iid=False, label="Non-IID (Active RIS - Conv-Aware)")
+    mean_iid, _ = run_fl_simulation_multiseed(train_data, test_data, num_clients, num_rounds, "ideal", True, "IID Ideal", num_seeds)
+    mean_non_iid, _ = run_fl_simulation_multiseed(train_data, test_data, num_clients, num_rounds, "ideal", False, "Non-IID Ideal", num_seeds)
+    mean_mse, std_mse = run_fl_simulation_multiseed(train_data, test_data, num_clients, num_rounds, "mse_min", False, "MSE-Min", num_seeds)
+    mean_conv, std_conv = run_fl_simulation_multiseed(train_data, test_data, num_clients, num_rounds, "conv_aware", False, "Conv-Aware", num_seeds)
     
     plt.figure(figsize=(8,6))
-    plt.plot(acc_iid, 'k-o', label='IID (Perfect Channel)')
-    plt.plot(acc_non_iid, 'b-s', label='Non-IID (Perfect Channel)')
-    plt.plot(acc_mse_min, 'r-x', label='Non-IID (Active RIS - MSE Min)')
-    plt.plot(acc_conv_aware, 'g-^', label='Non-IID (Active RIS - Proposed Conv-Aware)')
+    rounds_range = range(num_rounds + 1)
+    
+    plt.plot(rounds_range, mean_iid, 'k--', label='IID (Perfect Channel)')
+    plt.plot(rounds_range, mean_non_iid, 'b-', label='Non-IID (Perfect Channel)')
+    
+    plt.plot(rounds_range, mean_mse, 'r-', label='Non-IID (Active RIS - MSE Min)')
+    plt.fill_between(rounds_range, mean_mse - std_mse, mean_mse + std_mse, color='r', alpha=0.2)
+    
+    plt.plot(rounds_range, mean_conv, 'g-', label='Non-IID (Active RIS - Proposed Conv-Aware)')
+    plt.fill_between(rounds_range, mean_conv - std_conv, mean_conv + std_conv, color='g', alpha=0.2)
     
     plt.xlabel('Communication Round')
     plt.ylabel('Test Accuracy (%)')
     plt.legend()
     plt.grid(True)
-    plt.title('Exp 7-9: FL Convergence on MNIST (AirComp Integration)')
-    plt.savefig('results/figures/exp7_9_fl_convergence.png')
+    plt.title('Exp 7-9: FL Convergence on MNIST (True AirComp + CSI Errors)')
+    plt.savefig('results/figures/exp7_9_fl_convergence_stat.png')
     plt.close()
 
 if __name__ == '__main__':
