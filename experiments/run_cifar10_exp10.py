@@ -75,7 +75,7 @@ def run_exp10_cifar10_seed(train_data, test_data, num_clients, num_rounds, metho
         
     acc_history = [server.evaluate(test_loader)[0]]
     
-    for _ in range(num_rounds):
+    for round_idx in tqdm(range(num_rounds), desc="Rounds", leave=False):
         updates = [client.train(server.global_model) for client in clients]
             
         if method == "ideal":
