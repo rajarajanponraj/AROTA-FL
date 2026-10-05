@@ -17,6 +17,9 @@ from src.optimization.convergence_aware import optimize_convergence_aware
 from src.optimization.mse_minimization import optimize_mse_baseline
 
 def load_cifar10_full():
+    # Override the default slow URL with the fast mirror provided
+    datasets.CIFAR10.url = "https://data.mendeley.com/public-files/datasets/kfjcsbhhss/files/065c4880-68c0-4226-b305-c34802f18449/file_downloaded"
+    
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
