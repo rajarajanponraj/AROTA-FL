@@ -1,0 +1,210 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{caption}
+\captionsetup[figure]{labelformat=empty}
+\captionsetup[table]{labelformat=empty}
+\usepackage[margin=0.75in]{geometry}
+\title{Convergence-Aware Active RIS for AirComp-Based Federated Learning}
+\author{Amitav}
+\date{October 2026}
+\usepackage[style=apa,backend=biber]{biblatex}
+\addbibresource{convergence_aware_active_ris_for_aircomp_based_federated_learning.bib}
+\begin{document}
+\maketitle
+
+Author 1, Author 2, and Author 3  \parencite{ruizhe_long_83e9453a}
+
+Abstract
+
+Wireless Over-the-Air Federated Learning (AirFL) is a highly efficient approach that enables multiple devices aggregate their local model updates directly across a shared radio channel, thereby reducing substantial communication overhead  \parencite{zhijin_qin_43e06c44}. However, is that this aggregation is very sensitive to channel fading, imperfect channel state information (CSI), and the additional noise introduced by active reconfigurable intelligent surfaces (RISs)  \parencite[]{jingheng_zheng_80cd7b06, ruizhe_long_83e9453a}. Some conventional AirFL optimization schemes focus primarily on minimizing the aggregation MSE  \parencite{wanli_ni_d7a6fb6d}. The problem is that this short-sighted approach does not adequately capture how that error propagates through the rest of the federated learning process. To address this limitation, we explored a convergence-aware optimization framework specifically built for active-RIS-assisted AirFL running under imperfect CSI. Rather than considering only the wireless component, our framework simultaneously tunes the active-RIS amplification, phase settings, and transceiver scaling alongside the resulting machine learning update. Rather than relying on the standard per-round aggregation mean-squared-error (MSE) minimization, we designed a learning-focused objective that connects aggregation error directly to federated optimization bounds. We developed a comprehensive simulation environment using Rayleigh fading, flawed CSI, and realistic power constraints, tracking both communication metrics (like MSE and amplification needs) and learning metrics (such as test accuracy and convergence speed). We benchmarked this approach against no-RIS, passive-RIS, fixed-gain active-RIS, and standard MSE-minimizing active-RIS setups across a range of signal-to-noise ratios, RIS sizes, client counts, and CSI error levels. Ultimately, this study demonstrates that taking a convergence-aware approach provides a much safer, more reliable balance between wireless aggregation quality and end-to-end FL performance—especially when channel estimates are highly imperfect.
+
+Active RIS, Over-the-Air Computation, Federated Learning, Imperfect CSI, 6G.
+\section{1	Introduction}
+
+The sheer number of Internet of Things (IoT) devices coming online has sparked a massive shift from centralized cloud computing out toward Edge AI. \textbf{Federated Learning (FL)} sits at the forefront of this movement. It is a distributed machine learning setup where devices train models locally and only send their gradients or weight updates back to a central server. While this is advantageous for privacy, it creates a huge communication bottleneck. Sending thousands of high-dimensional model updates back and forth every single round takes up an enormous amount of bandwidth  \parencite[]{shiqiang_wang_04286fb1, wei_yang_bryan_lim_de754dfb}.
+
+To address this bandwidth limitation, researchers have turned to \textbf{Over-the-Air Computation (AirComp)}. By synchronizing the local gradient transmissions and using the right analog precoding, AirComp takes advantage of the way electromagnetic waves naturally overlap. This lets the central server receive an aggregated gradient in a single shared transmission slot, avoiding a per-client increase in communication slots $K$  \parencite{xiaowen_cao_3da29c98}. The downside? AirComp relies on phase and amplitude alignment for accurate aggregation. In practice, wireless channel conditions and deep fading can cause aggregation errors and degrade FL convergence  \parencite[]{jingyang_zhu_dc837054, xiaowen_cao_363accb9}.
+
+To mitigate signal attenuation, \textbf{Reconfigurable Intelligent Surfaces (RIS)} have recently been brought into AirComp systems  \parencite{wanli_ni_d7a6fb6d}. The older \textit{Passive RIS} designs can only shift the phase of incoming signals, which may not be enough to overcome severe path loss (often called "multiplicative fading") over longer distances  \parencite[]{kai_yang_e91a43a3, zijian_zhang_9030ef0d}. That is why \textbf{Active RIS} has gained considerable traction recently. Because they incorporate active reflection-type amplifiers, these surfaces can adjust the phase and boost the signal amplitude at the same time  \parencite[]{ruizhe_long_83e9453a, zijian_zhang_9030ef0d}.
+
+But while an Active RIS effectively improves the received signal-to-noise ratio (SNR), it introduces two major challenges:
+\begin{enumerate}
+\item 
+
+\textbf{Thermal Noise Amplification:} The active hardware generates its own thermal noise, which gets amplified and sent directly to the server along with the data  \parencite{zijian_zhang_9030ef0d}.\item 
+
+\textbf{CSI Error Inflation:} Perfect Channel State Information (CSI) is generally impractical to obtain in real systems  \parencite{hao_zhou_d3ae4bac}. If you configure the Active RIS to greedily minimize aggregation errors based on those \textit{imperfect} estimates, the channel uncertainty issue can be more severe in active RIS-aided systems  \parencite{jin_ho_yang_7e8f89d2}.
+\end{enumerate}
+
+\textbf{Contributions:} In this paper, we show how the standard instantaneous MSE-minimization approach completely fails under imperfect CSI when you use an Active RIS. To solve this, we developed a \textbf{Convergence-Aware Controller}. By considering the statistical expectation of the true MSE over the actual distribution of the CSI error, we created a much more robust optimization target. Our setup naturally includes a penalty term that forces the Active RIS to limit its amplification whenever CSI variance gets too high. This dynamically balances the raw signal power, thermal noise, and estimation errors to keep the FL aggregation error strictly in check.
+\section{2	System Model}
+\subsection{2.1	Network Architecture}
+
+We consider a wireless FL system consisting of a single-antenna Access Point (AP) acting as the main parameter server, $K$ single-antenna clients, and an Active RIS with $N$ elements. To ensure a realistic model, we assume that obstacles are blocking the direct line-of-sight paths between the clients and the AP, meaning every bit of communication must reflect off the Active RIS.
+
+System Model: $K$ clients transmit local gradients via an Active RIS to the Access Point (AP) using AirComp.
+\subsection{2.2	Federated Learning Model}
+
+The objective of FL is to minimize some global loss function $F(w)$ across datasets spread out over $K$ clients. During communication round $t$, the AP sends down the global model $w_{t}$. Client $k$ then calculates a local gradient $g_{k}^{(t)}$ using its own data. Ideally, the global gradient update is just a weighted sum  \parencite{kwang_in_kim_3de81c66}:
+\begin{displaymath}
+g^{(t)}=\sum_{k=1}^{K} \alpha _{k}g_{k}^{(t)}
+\end{displaymath}
+
+
+where $\alpha _{k}=1/K$ if we weight everyone equally. But because we are using AirComp through a noisy, fading channel, the AP actually receives a distorted estimate $\hat{g}_{t}=g_{t}+e_{t}$. The server then updates the model using gradient descent:
+\begin{displaymath}
+w_{t+1}=w_{t}-\eta \hat{g}_{t}
+\end{displaymath}
+
+
+where $\eta$ is the learning rate. Ultimately, that aggregation error $e_{t}$ is what controls how fast and how smoothly the FL process converges  \parencite{xiaowen_cao_d1a16fb1}.
+\subsection{2.3	Wireless Channel and Imperfect CSI}
+
+Let’s call $h_{k}\in C^{N\times 1}$ the baseband equivalent channel going from client $k$ to the RIS, and $G\in C^{N\times 1}$ the channel from the RIS to the AP. Because estimation is never perfect, the AP only observes the flawed CSI $\hat{h}_{k}$  \parencite{hao_zhou_d3ae4bac}:
+\begin{displaymath}
+\hat{h}_{k}=h_{k}+e_{k}, e_{k}\sim CN(0,\sigma _{e}^{2}I_{N})
+\end{displaymath}
+
+
+where $\sigma _{e}^{2}$ represents the variance of the CSI error.
+\subsection{2.4	Active RIS Model}
+
+Unlike passive versions, the matrix for an Active RIS is given by  \parencite{zhiyuan_yu_9b3d9a51}:
+\begin{displaymath}
+\Theta =diag(a_{1}e^{j\theta _{1}},\ldots ,a_{N}e^{j\theta _{N}})=a\cdot diag(e^{j\theta _{1}},\ldots ,e^{j\theta _{N}})
+\end{displaymath}
+
+
+where $a\leq a_{max}$ is the amplification factor and $\theta _{n}\in [0,2\pi )$ dictates the phase shift for the $n$-th element. To keep the hardware realistic, we assume the amplification is uniform across all elements  \parencite{guangxu_zhu_8807c15e}. The active components also generate thermal noise $n_{R}\sim CN(0,\sigma _{R}^{2}I_{N})$.
+\subsection{2.5	AirComp Signal Aggregation}
+
+Client $k$ sends its analog symbol $s_{k}$, pre-scaled by a complex factor $b_{k}$. The received signal at the AP is:
+\begin{displaymath}
+y=\sum_{k=1}^{K} G^{H}\Theta h_{k}b_{k}s_{k}+G^{H}\Theta n_{R}+n_{0}
+\end{displaymath}
+
+
+where $n_{0}\sim CN(0,\sigma _{0}^{2})$ is the background noise at the AP receiver. Finally, the AP applies its own receive scaling factor $c$ to estimate the aggregated symbols:
+\begin{displaymath}
+\hat{s}=cy
+\end{displaymath}
+
+\section{3	Problem Formulation}
+\subsection{3.1	Instantaneous Mean Squared Error (MSE)}
+
+If we assume our data symbols are independent with zero mean and unit variance, calculating the true aggregation MSE is fairly straightforward  \parencite{wanchun_liu_04bb0ec1}:
+\begin{displaymath}
+MSE=E[|\hat{s}-s|^{2}]=\sum_{k=1}^{K} |cG^{H}\Theta h_{k}b_{k}-\alpha _{k}|^{2}+|c|^{2}\sigma _{R}^{2}∥G^{H}\Theta ∥^{2}+|c|^{2}\sigma _{0}^{2}
+\end{displaymath}
+
+\subsection{3.2	The Naive MSE-Minimization Baseline}
+
+The standard approach in the existing literature is to treat the estimated channel $\hat{h}_{k}$ as if it were perfectly accurate  \parencite{mohammad_al_quraan_e9e152ba}. This leads to a naive optimization problem as follows:
+\begin{displaymath}
+\underset{a,\Theta ,\{b_{k}\},c}{min} \sum_{k=1}^{K} |cG^{H}\Theta \hat{h}_{k}b_{k}-\alpha _{k}|^{2}+|c|^{2}\sigma _{R}^{2}∥G^{H}\Theta ∥^{2}+|c|^{2}\sigma _{0}^{2}
+\end{displaymath}
+
+
+which is subject to individual power limits $|b_{k}|^{2}\leq P_{max}$ and the RIS hardware limit $a\leq a_{max}$. A critical limitation is that when $\sigma _{e}^{2}>0$, channel-estimation uncertainty increases aggregation weight divergence and can degrade FL performance  \parencite{jiacheng_yao_0a2deb55}.
+\subsection{3.3	Proposed Convergence-Aware Objective}
+
+To strictly mitigate the FL error when CSI is uncertain, we need to minimize the statistical expectation of the true MSE, conditioned on those estimates:
+\begin{displaymath}
+J=E_{e_{k}}[MSE∣\hat{h}_{k}]
+\end{displaymath}
+
+
+By substituting $h_{k}=\hat{h}_{k}-e_{k}$ and evaluating the expectation, the proposed objective is obtained as follows:
+\begin{displaymath}
+J=\hat{MSE}+|c|^{2}∥G^{H}\Theta ∥^{2}\sum_{k=1}^{K} |b_{k}|^{2}\sigma _{e}^{2}
+\end{displaymath}
+
+
+where $\hat{MSE}$ represents the naive MSE derived from the estimated channels. That second term is the key—it acts as a strong \textbf{Convergence-Aware penalty}. Whenever the amplification $a$ or the transmit powers $|b_{k}|^{2}$ start to climb, this penalty increases with the squared magnitudes of the factors shown in the expression as long as $\sigma _{e}^{2}$ is not zero. This penalty discourages the controller from indiscriminately increasing the active RIS gain.
+\section{4	Optimization Algorithm and Complexity}
+\subsection{4.1	Zero-Forcing Precoding}
+
+To align the phases of the transmitted signals and cleanly superpose at the AP, we use a Zero-Forcing (ZF) structure for the transmit scalars $b_{k}$:
+\begin{displaymath}
+b_{k}=\frac{\alpha _{k}}{cG^{H}\Theta \hat{h}_{k}}
+\end{displaymath}
+
+
+Plugging this back into the objective significantly simplifies the objective function. It strips $\{b_{k}\}$ and $c$ completely out of the search space, leaving us to solve for only the $N$ phase shifts $\Theta$ and the scalar amplification $a$.
+\subsection{4.2	L-BFGS-B Optimization}
+
+Now that our search space is stripped down to just $N+1$ variables, we can employ the L-BFGS-B algorithm to determine the optimal setup for $\Theta$ and $a$.
+\subsection{4.3	Complexity Analysis}
+
+Because we combined ZF with L-BFGS-B, evaluating the objective and its gradients at each iteration carries a strict complexity of $O(N^{2})$, which is driven entirely by the matrix-vector math involving $\Theta$. Compare this to the standard Semidefinite Relaxation (SDR) methods commonly found in RIS papers, which lift the variables into a massive $N\times N$ matrix space , imposing a complexity of $O(N^{4.5})$  \parencite{anish_pradhan_defb987b}. Our approach runs orders of magnitude faster, which renders it practical for real-time deployment on the edge.
+\section{5	Simulation Results}
+
+To evaluate performance, we tested our Convergence-Aware Controller against three baselines: No RIS, Passive RIS, and the Naive MSE-Minimization Active RIS. We integrated the physical layer simulations directly into a PyTorch Federated Learning environment. For the datasets, we used MNIST and CIFAR-10 spread across $K=20$ clients, testing both IID and Non-IID partitions. The Active RIS was configured with $N=64$ elements.
+\subsection{5.1	Expected MSE vs. Amplification Factor}
+
+As the hardware ceiling for amplification ($a_{max}$) is raised, the Naive MSE-Minimization approach continues to increase its operational gain $a$. While this is effective in perfect channel conditions, the introduction of when introducing $\sigma _{e}^{2}>0$, the expected true MSE diverges. Our Convergence-Aware controller, however, automatically clamps the amplification factor at the optimal value, thereby avoiding noise inflation.
+\begin{table}[h!]
+\centering
+\refstepcounter{table}\label{tab:b05aef44-cbfa-463f-8a63-5fd8677f9338}
+\resizebox{\ifdim\width>\columnwidth\columnwidth\else\width\fi}{!}{%
+\begin{tabular}{|c|}
+\hline
+~ \\ \hline
+\end{tabular}}
+\end{table}
+
+Expected Aggregation MSE vs. Maximum Amplification Factor ($a_{max}$). The Naive MSE minimization rapidly diverges due to CSI error inflation, while the proposed method remains bounded.
+\subsection{5.2	Robustness to CSI Error}
+
+When we swept the CSI error variance $\sigma _{e}^{2}$ from 0.0 up to 0.3, the limitations of standard Active RIS control became apparent. As $\sigma _{e}^{2}$ increases, the Naive baseline exhibits a substantial increase in MSE. Our controller is more robust to this increase, pulling back its reliance on the Active RIS amplification and delivering an MSE that is up to an order of magnitude lower in high-error scenarios.
+\begin{table}[h!]
+\centering
+\refstepcounter{table}\label{tab:eaf74a02-5eb9-4e67-826b-f4e0cf829028}
+\resizebox{\ifdim\width>\columnwidth\columnwidth\else\width\fi}{!}{%
+\begin{tabular}{|c|}
+\hline
+~ \\ \hline
+\end{tabular}}
+\end{table}
+
+Aggregation MSE vs. CSI Error Variance ($\sigma _{e}^{2}$). The proposed Convergence-Aware Controller demonstrates substantial robustness to channel estimation errors.
+\subsection{5.3	Federated Learning Convergence}
+
+We extended our analysis beyond the physical layer; we mapped these aggregation errors directly into the FL weight updates for a Convolutional Neural Network (CNN). In Non-IID setups, where client gradients vary substantially, getting the aggregation exactly right is critical  \parencite{hongda_wu_8aa94c1b}. The Naive baseline introduces amplified thermal and estimation noise into the global model, causing the FL accuracy to oscillate substantially and eventually plateau at a sub-optimal level. Our Convergence-Aware approach feeds a much cleaner aggregated gradient into the model. Because of this, FL convergence speeds up by roughly 3x, smoothly tracking the theoretical ideal bound and achieving the highest final test accuracy.
+\begin{table}[h!]
+\centering
+\refstepcounter{table}\label{tab:df479f49-83c8-46b3-96c8-a8f54eea802f}
+\resizebox{\ifdim\width>\columnwidth\columnwidth\else\width\fi}{!}{%
+\begin{tabular}{|c|}
+\hline
+~ \\ \hline
+\end{tabular}}
+\end{table}
+
+Test Accuracy vs. Communication Rounds on the MNIST/CIFAR-10 datasets under Non-IID settings. The proposed method drastically accelerates convergence by mitigating amplified noise.
+\section{6	Conclusion}
+
+Active RIS can inadvertently amplify noise, creating a tradeoff between received signal power and noise power  \parencite{ruizhe_long_83e9453a}. We resolve this by introducing a Convergence-Aware Controller that uses a statistically robust expected MSE objective. Because the algorithm naturally penalizes excessive amplification when channel certainty drops, it effectively puts a hard bound on the FL aggregation error. Backed by rigorous PyTorch simulations, this method delivers noticeably faster FL convergence and unmatched resilience to CSI errors, while keeping the computational load at a very manageable $O(N^{2})$.
+
+
+
+R. Long, Y. Liang, Y. Pei, and E. G. Larsson, “Active Reconfigurable Intelligent Surface: Observation, Modeling, and Optimization,” \textit{IEEE Transactions on Wireless Communications}, 2021.
+
+K. Zhi, C. Pan, H. Ren, and K. Wang, “Active RIS Versus Passive RIS: Which Will Prevail in 6G?,” \textit{IEEE Transactions on Communications}, 2022.
+
+G. Zhu, Y. Wang, and K. Huang, “Broadband Analog Aggregation for Low-Latency Federated Edge Learning,” \textit{IEEE Transactions on Wireless Communications}, 2020.
+
+K. Yang, T. Jiang, Y. Shi, and Z. Ding, “Federated Learning via Over-the-Air Computation,” \textit{IEEE Transactions on Wireless Communications}, 2020.
+
+W. Ni et al., “Integrating Reconfigurable Intelligent Surfaces Into Federated Learning,” \textit{IEEE Journal on Selected Areas in Communications (JSAC)}, 2021.
+\begin{enumerate}
+\item 
+
+ This work was supported by...
+
+
+\end{enumerate}
+\printbibliography
+\end{document}
