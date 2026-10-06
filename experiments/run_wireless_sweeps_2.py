@@ -72,7 +72,7 @@ def run_exp5_ris_size_sweep(num_seeds=5):
         res_mse['MSE-Min Active'].append(m_opt / num_seeds)
         res_mse['Conv-Aware Active'].append(m_conv / num_seeds)
         
-    plot_and_save(N_range, res_mse, 'Number of RIS Elements ($N$)', 'Expected MSE', 'Exp 5: Impact of RIS Size', 'exp5_ris_size.png')
+    plot_and_save(N_range, res_mse, 'Number of RIS Elements ($N$)', 'Expected MSE', 'Exp 5: Impact of RIS Size', 'exp5_ris_size.eps')
 
 def run_exp6_client_count_sweep(num_seeds=5):
     print("Running Exp 6: Client Count Sweep...")
@@ -105,7 +105,7 @@ def run_exp6_client_count_sweep(num_seeds=5):
         res_mse['MSE-Min Active'].append(m_opt / num_seeds)
         res_mse['Conv-Aware Active'].append(m_conv / num_seeds)
         
-    plot_and_save(K_range, res_mse, 'Number of Clients ($K$)', 'Expected MSE', 'Exp 6: Impact of Client Scalability', 'exp6_client_count.png')
+    plot_and_save(K_range, res_mse, 'Number of Clients ($K$)', 'Expected MSE', 'Exp 6: Impact of Client Scalability', 'exp6_client_count.eps')
 
 if __name__ == '__main__':
     os.makedirs('results/figures', exist_ok=True)

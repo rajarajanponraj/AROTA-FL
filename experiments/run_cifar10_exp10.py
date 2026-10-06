@@ -126,7 +126,7 @@ def run_exp10_cifar10():
     plt.legend()
     plt.grid(True)
     plt.title('Exp 10: CIFAR-10 FL Convergence (Non-IID, Multi-seed)')
-    plt.savefig('results/figures/exp10_cifar10_convergence_stat.png')
+    plt.savefig('results/figures/exp10_cifar10_convergence_stat.eps')
     plt.close()
 
 if __name__ == '__main__':

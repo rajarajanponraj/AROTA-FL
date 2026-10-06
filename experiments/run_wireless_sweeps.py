@@ -80,7 +80,7 @@ def run_exp1_mse_vs_amplification(num_seeds=5):
         res['MSE-Min Active'].append(m_opt / num_seeds)
         res['Conv-Aware Active'].append(m_conv / num_seeds)
         
-    plot_and_save(a_max_range, res, 'Max Amplification ($a_{max}$)', 'Expected MSE', 'Exp 1: MSE vs Amplification', 'exp1_mse_vs_amp.png')
+    plot_and_save(a_max_range, res, 'Max Amplification ($a_{max}$)', 'Expected MSE', 'Exp 1: MSE vs Amplification', 'exp1_mse_vs_amp.eps')
 
 def run_exp2_3_snr_sweep(num_seeds=5):
     print("Running Exp 2 & 3: MSE and Amplification vs SNR...")
@@ -125,8 +125,8 @@ def run_exp2_3_snr_sweep(num_seeds=5):
         res_amp['MSE-Min Active'].append(a_opt_mean / num_seeds)
         res_amp['Conv-Aware Active'].append(a_conv_mean / num_seeds)
         
-    plot_and_save(P_dbm_range, res_mse, 'Transmit Power Budget $P_{max}$ (dBm)', 'Expected MSE', 'Exp 2: MSE vs Power Budget', 'exp2_mse_vs_snr.png')
-    plot_and_save(P_dbm_range, res_amp, 'Transmit Power Budget $P_{max}$ (dBm)', 'Optimal Amplification Factor', 'Exp 3: Amplification vs Power Budget', 'exp3_amp_vs_snr.png')
+    plot_and_save(P_dbm_range, res_mse, 'Transmit Power Budget $P_{max}$ (dBm)', 'Expected MSE', 'Exp 2: MSE vs Power Budget', 'exp2_mse_vs_snr.eps')
+    plot_and_save(P_dbm_range, res_amp, 'Transmit Power Budget $P_{max}$ (dBm)', 'Optimal Amplification Factor', 'Exp 3: Amplification vs Power Budget', 'exp3_amp_vs_snr.eps')
 
 def run_exp4_csi_error_sweep(num_seeds=5):
     print("Running Exp 4: CSI Error Sweep...")
@@ -157,7 +157,7 @@ def run_exp4_csi_error_sweep(num_seeds=5):
         res_mse['MSE-Min Active'].append(m_opt / num_seeds)
         res_mse['Conv-Aware Active'].append(m_conv / num_seeds)
         
-    plot_and_save(error_range, res_mse, 'CSI Error Variance $\sigma_e^2$', 'Expected MSE', 'Exp 4: Robustness to CSI Error', 'exp4_csi_sweep.png')
+    plot_and_save(error_range, res_mse, 'CSI Error Variance $\sigma_e^2$', 'Expected MSE', 'Exp 4: Robustness to CSI Error', 'exp4_csi_sweep.eps')
 
 if __name__ == '__main__':
     os.makedirs('results/figures', exist_ok=True)

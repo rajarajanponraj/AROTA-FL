@@ -137,7 +137,7 @@ def run_exp7_8_9():
     plt.legend()
     plt.grid(True)
     plt.title('Exp 7-9: FL Convergence on MNIST (True AirComp + CSI Errors)')
-    plt.savefig('results/figures/exp7_9_fl_convergence_stat.png')
+    plt.savefig('results/figures/exp7_9_fl_convergence_stat.eps')
     plt.close()
 
 if __name__ == '__main__':

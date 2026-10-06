@@ -131,9 +131,9 @@ def run_heterogeneity_sweep():
     plt.title('FL Accuracy vs Data Heterogeneity (AirComp Simulation)')
     plt.legend()
     plt.grid(True)
-    plt.savefig('results/figures/exp11_acc_vs_heterogeneity.png')
+    plt.savefig('results/figures/exp11_acc_vs_heterogeneity.eps')
     plt.close()
-    print("Saved exp11_acc_vs_heterogeneity.png")
+    print("Saved exp11_acc_vs_heterogeneity.eps")
 
 def run_snr_impact_sweep():
     print("Running Exp 12: FL Accuracy vs. Transmit Power Limit (P_max)...")
@@ -166,9 +166,9 @@ def run_snr_impact_sweep():
     plt.title('FL Accuracy vs Transmit Power Budget (AirComp Simulation)')
     plt.legend()
     plt.grid(True)
-    plt.savefig('results/figures/exp12_acc_vs_snr.png')
+    plt.savefig('results/figures/exp12_acc_vs_snr.eps')
     plt.close()
-    print("Saved exp12_acc_vs_snr.png")
+    print("Saved exp12_acc_vs_snr.eps")
 
 if __name__ == "__main__":
     run_heterogeneity_sweep()
