@@ -1,0 +1,21 @@
+\begin{table}[t]
+\centering
+\caption{System and Simulation Parameters}
+\label{tab:sim_parameters}
+\scriptsize
+\setlength{\tabcolsep}{1.8pt}
+\begin{tabular}{lc|lc}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Parameter} & \textbf{Value} \\
+\midrule
+FL Clients ($K$) & $10$ & Rician factor ($\kappa$) & $10.0$ \\
+Active Elements ($N$) & $32$ & Client power ($P_{\max}$) & $10$ dBm \\
+Dist. $d_{\text{RIS},\text{AP}}$ & $80$ m & RIS power ($P_{\text{RIS},\max}$) & $2.0$ W \\
+Dist. $d_{AP}$, $d_{k}$ & $100$--$150$, $20$--$50$ m & AP noise ($\sigma_0^2$) & $-90$ dBm \\
+Path loss exp. ($\alpha$) & $3.76$ & RIS noise ($\sigma_R^2$) & $-80$ dBm \\
+CSI error std. ($\sigma_e$) & $0.10$ & Max gain ($a_{\max}$) & $15.0$ \\
+Learning rate ($\eta$) & $0.01$ & Dirichlet conc. ($\alpha$) & $0.5$ \\
+Epochs / Batch & $1$ / $64$ & CNN Model & Conv2D-ReLU \\
+\bottomrule
+\end{tabular}
+\end{table}

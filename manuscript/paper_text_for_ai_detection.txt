@@ -1,0 +1,165 @@
+TITLE:
+Convergence-Aware Active RIS for AirComp-Based Federated Learning Under Imperfect CSI
+
+ABSTRACT:
+Over-the-Air Federated Learning (AirFL) enables distributed edge devices to aggregate local model parameters concurrently over shared radio spectrum, decoupling transmission latency from the user population. However, the analog superposition principle is vulnerable to channel fading, active reconfigurable intelligent surface (RIS) amplification noise, and channel state information (CSI) estimation errors. Conventional AirFL designs commonly optimize transceiver scalers and surface reflection coefficients by minimizing instantaneous signal mean-squared error (MSE) evaluated on estimated channels. This work reveals that under imperfect CSI, such naive MSE minimization aggressively saturates active RIS amplification, severely inflating aggregated channel uncertainties and stalling federated learning convergence. To resolve this breakdown, we formulate a convergence-aware joint transceiver and active RIS optimization framework. By taking the conditional expectation of the physical aggregation error over the distribution of CSI estimation uncertainty, we analytically derive an exact regularized penalty that couples surface amplification gain with transmit power and error variance. We establish a direct analytical linkage between the derived objective and the theoretical descent guarantee of L-smooth federated optimization. Exploiting closed-form zero-forcing transceiver scaling, the joint problem is reduced to bound-constrained optimization over N+1 variables, exhibiting a lightweight per-iteration complexity of O(N^2) that is substantially lower than semidefinite relaxation methods (O(N^4.5)). Extensive physical-layer sweeps and PyTorch simulations on MNIST and CIFAR-10 demonstrate that the proposed controller dynamically clamps active amplification, achieving up to 10x lower aggregation MSE under high CSI uncertainty, 3x faster learning convergence, and test accuracies that closely trace ideal noise-free communications.
+
+INDEX TERMS:
+Active RIS, Over-the-Air Computation, Federated Learning, Imperfect CSI, Convergence Analysis, Edge Intelligence.
+
+=== SECTION: Introduction ===
+
+The rapid deployment of intelligent edge devices has driven the shift toward decentralized machine learning paradigms. Federated Learning (FL) enables distributed clients to train a shared global model iteratively while maintaining raw training samples on edge devices . In conventional digital communications based on orthogonal multiple access (OMA), participating clients sequentially upload high-dimensional parameter updates or gradients to a central parameter server. As the client population K or parameter dimension d grows, this orthogonal transmission pipeline incurs severe uplink latency and spectrum congestion, creating an operational bottleneck at the wireless edge .
+
+To overcome bandwidth limitations, Over-the-Air Computation (AirComp) has emerged as an analog physical-layer aggregation mechanism . Exploiting the natural superposition property of electromagnetic waves in a multiple-access channel, AirComp coordinates synchronized analog transmissions across edge devices. The central Access Point (AP) receives the sum of simultaneous analog waveforms directly in a single channel use, reducing aggregation latency to a constant independent of the client count K . 
+
+Nevertheless, the fidelity of analog AirComp depends critically on accurate phase alignment and amplitude normalization. When wireless channels undergo severe multipath fading or non-line-of-sight (NLoS) blockage, signal attenuation degrades the received signal-to-noise ratio (SNR), causing aggregation errors that slow down or destabilize federated optimization . Reconfigurable Intelligent Surfaces (RISs) have recently been introduced to establish favorable virtual line-of-sight (LoS) links . However, traditional passive RISs rely exclusively on passive phase-shifting elements. Consequently, passive RIS-assisted links suffer from the fundamental "double-fading" (multiplicative path-loss) attenuation, requiring massive element counts N to achieve meaningful signal enhancements .
+
+Active RIS technology addresses this limitation by integrating active reflection-type amplifiers into the surface elements . Active RISs can simultaneously adjust signal phases and amplify reflected amplitudes, effectively compensating for multiplicative propagation losses with compact physical apertures . Despite these structural gains, active RIS deployments introduce two coupled challenges:
+
+• Thermal Noise Amplification: The active components introduce inherent thermal noise at the surface, which is amplified and forwarded to the AP receiver .
+ 
+• CSI Uncertainty Inflation: Obtaining perfect Channel State Information (CSI) for high-dimensional reflected channels is challenging in practice . In existing literature, beamforming and surface configurations are commonly designed by minimizing the estimated instantaneous aggregation mean-squared error (MSE), treating imperfect channel estimates as ground truth .
+
+In this paper, we demonstrate that naive instantaneous MSE minimization breaks down when applied to active RIS-assisted AirFL under imperfect CSI. Because estimated channels omit the stochastic variance of estimation errors, the solver drives the active amplification gain to its hardware ceiling. This excessive amplification heavily inflates both the active thermal noise and the underlying channel estimation errors, injecting severe noise into the global gradient update and degrading FL convergence.
+
+--- Contributions ---
+
+To address this vulnerability, we propose a convergence-aware optimization framework for active-RIS-assisted AirComp federated learning. Our key contributions are:
+
+• Closed-Form Expected Error Formulation: We derive the exact conditional expectation of aggregation error over Gaussian CSI uncertainties, exposing an analytical regularization penalty proportional to amplification gain, transmit power, and CSI error variance.
+ 
+• FL Convergence Linkage: Using the L-smooth descent lemma, we prove that the derived objective directly minimizes the upper bound on expected per-round loss reduction.
+ 
+• Low-Complexity Algorithm: We establish closed-form ZF transceiver scaling, reducing the joint problem to N+1 active RIS variables solved via Quasi-Newton optimization in O(N^2) complexity, bypassing expensive SDR solvers.
+ 
+• Cross-Layer Validation: Extensive physical-layer sweeps (500 Monte Carlo seeds) and PyTorch FL simulations on MNIST/CIFAR-10 under non-IID partitions demonstrate up to 10x MSE reduction and 3x faster convergence over naive baselines.
+
+The remainder of this paper is organized as follows: Section II details the system model; Section III develops the convergence-aware formulation; Section IV presents the joint algorithm; Section V reports simulation results; and Section VI concludes the paper.
+
+=== SECTION: System Model ===
+
+--- Network Architecture ---
+
+We consider a distributed wireless network comprising a single-antenna Access Point (AP) serving as the central parameter server, K single-antenna distributed edge clients, and an active RIS equipped with N reflecting elements (Fig. (Ref)). The direct wireless links between edge clients and the AP are assumed to be blocked by obstacles, such that uplink communication is predominantly assisted by the active RIS. The mathematical formulation accommodates direct channel links where present.
+
+--- Federated Learning Model ---
+
+The objective of federated learning is to minimize an empirical global loss function F(w) defined over distributed client datasets:
+ [Equation] 
+where p_k >= 0 represents the aggregation weight for client k (p_k = 1/K for uniform participation), and F_k(w) is the local empirical risk evaluated on local dataset D_k.
+
+At global communication round t, the AP broadcasts the current global parameter vector w_t to all clients. Each client k performs local stochastic gradient descent (SGD) for E local epochs, generating local parameter update g_k,t. The ideal global model update is:
+ [Equation] 
+where alpha_k = p_k. Over the fading multi-access channel, the AP receives a corrupted estimate g_t = g_t + e_t^aggr. The global model is then updated via:
+ [Equation] 
+where eta > 0 denotes the global learning rate. The aggregation error variance E[\|e_t^aggr\|^2] directly impacts convergence stability .
+
+--- Channel Propagation and Imperfect CSI ---
+
+Let h_k in C^N x 1 denote the uplink channel from client k to the active RIS, G^H in C^1 x N denote the channel from the active RIS to the AP, and h_d,k in C denote the direct client-to-AP link. The channel coefficients capture both large-scale path loss and small-scale fading. To model practical propagation environments, we adopt Rician fading with line-of-sight (LoS) factor kappa = 10.0 and 3GPP distance-dependent attenuation :
+ [Equation] 
+
+In practical systems, channel estimation is imperfect . The AP acquires estimated client-to-RIS channels h_k corrupted by additive estimation error e_k:
+ [Equation] 
+where sigma_e^2 denotes the CSI error variance. The direct link estimate satisfies h_d,k = h_d,k + e_d,k with e_d,k CN(0, sigma_e^2), while the stationary RIS-to-AP link G^H is reliably tracked .
+
+--- Active RIS Signal and Noise Model ---
+
+The reflection matrix of an N-element active RIS is expressed as:
+ [Equation] 
+where a_n >= 0 is the amplification factor and theta_n in [0, 2) is the phase shift of element n. Following hardware-efficient designs , uniform amplification across all elements is applied: a_1 = = a_N = a, subject to 1.0 <= a <= a_max.
+
+Unlike passive surfaces, the active amplifier circuits introduce non-negligible thermal noise n_R CN(0, sigma_R^2 I_N) at the surface elements . The signal reflected by the active RIS is:
+ [Equation] 
+where s_k is the transmitted symbol and b_k is the transmit precoding scalar. The total output power radiated by the active surface must satisfy:
+ [Equation] 
+
+--- AirComp Signal Superposition ---
+
+Each client k normalizes its local gradient entries to analog symbols s_k satisfying E[|s_k|^2] = 1 and applies complex transmit scalar b_k. The superimposed waveform received at the AP is:
+ [Equation] 
+where h_k^eff = h_d,k + G^H Theta h_k denotes the composite effective channel, and n_0 CN(0, sigma_0^2) is the receiver background AWGN. The AP applies a receive normalization factor c > 0 to construct the aggregation estimate:
+ [Equation] 
+
+=== SECTION: Problem Formulation and Proposed Framework ===
+
+--- Instantaneous Aggregation MSE ---
+
+The target aggregated quantity is s = _k=1^K alpha_k s_k. Given mutual statistical independence between zero-mean signal updates s_k, active RIS thermal noise n_R, and receiver noise n_0, the true instantaneous Mean Squared Error (MSE) is:
+ [Equation] 
+
+--- Failure of the Naive MSE-Minimization Baseline ---
+
+In conventional AirComp literature, the optimization problem is formulated by substituting estimated channels h_k directly into (Equation):
+ [Equation] 
+subject to individual power constraints |b_k|^2 <= P_max and a <= a_max.
+
+Because (Equation) ignores estimation error variance sigma_e^2, increasing a appears strictly beneficial: higher active gain increases |h_k^eff|, which reduces the required receive scaling factor c 1/|h_k^eff|. Consequently, the solver drives a -> a_max. In reality, however, the actual channel is h_k = h_k - e_k. When a is driven to its maximum, the true signal misalignment |c G^H Theta e_k b_k|^2 scales with a^2, severely distorting the aggregated updates.
+
+--- Proposed Convergence-Aware Objective ---
+
+To prevent noise inflation under channel uncertainty, we formulate an objective that takes the conditional statistical expectation of the true MSE over the estimation error distribution e_k CN(0, sigma_e^2 I_N):
+ [Equation] 
+
+Substituting h_k = h_k - e_k into (Equation), the effective composite channel expands as h_k^eff = h_k^eff - G^H Theta e_k - e_d,k.
+The expected signal misalignment term for client k evaluates to:
+ [Equation] 
+Because E[e_k] = 0, the cross-terms vanish identically. Using E[e_k^H A e_k] = sigma_e^2 Tr(A), the expectation evaluates to sigma_e^2 \|G^H Theta\|^2. Summing over all K clients, the proposed Convergence-Aware objective is obtained in closed form:
+ [Equation] 
+The final term, Delta J_t = |c|^2 \|G^H Theta\|^2 sigma_e^2 _k=1^K |b_k|^2, acts as an analytical regularization penalty. When CSI error variance sigma_e^2 > 0, excessive surface gain \|Theta\|^2 a^2 incurs a quadratic cost. This provides the mathematical mechanism that causes the controller to back off amplification when channel conditions are uncertain.
+
+--- Federated Learning Convergence Guarantee ---
+
+We establish the analytical connection between minimizing J_t and the end-to-end federated learning convergence rate.
+
+Theorem 1. Assume F(w) is L-smooth (\|grad F(w_a) - grad F(w_b)\| <= L \|w_a - w_b\|) and local updates are unbiased (E[g_k,t] = grad F_k(w_t) with variance <= sigma_g^2). For learning rate eta < 2/L, the expected per-round loss progression satisfies:
+ [Equation] 
+Proof: Expanding F(w_t+1) <= F(w_t) - eta grad F(w_t), g_t + L eta^22 \|g_t\|^2 with g_t = g_t + e_t^aggr and evaluating expectations over noise and estimation errors (where E[e_t^aggr] = 0 and E[\|e_t^aggr\|^2] = d * J_t) yields (Equation). 
+
+Theorem 1 proves that minimizing J_t directly tightens the upper bound on per-round loss reduction, ensuring that physical-layer transceiver and RIS optimization is rigorously aligned with learning convergence.
+
+=== SECTION: Joint Optimization Algorithm and Complexity ===
+
+--- Closed-Form Zero-Forcing Transceiver Precoding ---
+
+To eliminate phase distortion and ensure unbiased analog signal alignment at the AP, Zero-Forcing (ZF) precoding is applied based on the estimated effective channel h_k^eff:
+ [Equation] 
+Substituting (Equation) into the individual transmit power constraint |b_k|^2 <= P_max yields:
+ [Equation] 
+
+By substituting b_k^* and c^* into (Equation), the signal misalignment term vanishes identically. Consequently, the variables \b_k\ and c are determined in closed form for any given surface configuration, reducing the optimization domain to the N+1 active RIS parameters: amplification gain a and phase shifts theta = [theta_1, , theta_N]^T.
+
+--- Bound-Constrained Quasi-Newton Optimization ---
+
+With transceiver variables eliminated, the joint optimization problem reduces to:
+ [Equation] 
+Problem (Equation) is non-convex due to trigonometric coupling in h_k^eff. We solve it via multi-start Sequential Least Squares Programming (SLSQP) / L-BFGS-B with box constraints over M random restarts to prevent entrapment in local minima.
+
+--- Computational Complexity Analysis ---
+
+Per objective evaluation, computing G^H Theta h_k requires O(K N) operations, \|G^H Theta\|^2 requires O(N), and transceiver factors c^*, \b_k^*\ require O(K), giving O(K N) total cost per function call. With D = N+1 optimization variables, the per-iteration Quasi-Newton update scales as O(D^2) = O(N^2). Thus, for I_iter iterations and M restarts, the overall complexity is O(M * I_iter * (K N + N^2)) O(N^2) for N > K. In contrast, Semidefinite Relaxation (SDR) requires O(N^4.5) , demonstrating that our framework is well-suited for real-time edge execution.
+
+=== SECTION: Experimental Performance Evaluation ===
+
+--- Simulation Setup ---
+
+Simulation parameters are listed in Table (Ref). We evaluate K=10 clients in a cell of radius 150 m with an active RIS at d_RIS,AP = 80 m under Rician fading (kappa = 10.0). We benchmark four schemes: 1) Passive RIS (a=1.0, phase-only); 2) Fixed Active RIS (a=a_max); 3) Naive Active RIS (minimizing estimated MSE (Equation) without error regularization); and 4) Proposed Convergence-Aware Active RIS (minimizing regularized J_t (Equation)).
+
+--- Physical-Layer Wireless Sweeps ---
+
+1) Amplification Gain Trade-Off (Exp 1): Fig. (Ref) plots aggregation MSE vs. a_max. Passive RIS remains elevated (J_t 8 x 10^-2) due to double-fading. Naive active RIS initially improves but diverges sharply beyond a_max 6.0, exceeding the passive baseline because it greedily boosts a -> a_max, multiplying thermal noise and CSI errors. Conversely, the proposed controller detects penalty Delta J_t, clamping gain at the optimal trade-off to maintain J_t 10^-4 (a 400x reduction).
+
+2) Robustness to CSI Uncertainty (Exp 4): Fig. (Ref) evaluates MSE over sigma_e^2 in [0.0, 0.30]. At sigma_e^2 = 0, both schemes match. As sigma_e^2 increases, naive MSE degrades by over an order of magnitude, whereas our controller dynamically throttles gain, yielding up to 10x lower MSE at sigma_e^2 = 0.30.
+
+3) Gain Adaptation vs. Transmit Power (Exp 2 \& 3): Fig. (Ref) tracks optimal gain a^* across P_max in [-10, 30] dBm. At low SNR (P_max <= 0 dBm), both deploy maximum gain (a^* = 15.0) to overcome AP noise. At high SNR (P_max >= 10 dBm), transmitters compensate for path loss; our controller backs off a^* from 15.0 to 1.2, while naive optimization remains saturated at a^* = 15.0, incurring severe noise penalty.
+
+--- Federated Learning Convergence ---
+
+We integrate the AirComp channel into PyTorch FL simulations with K=20 clients training a CNN on MNIST and CIFAR-10 under non-IID Dirichlet partitioning (alpha=0.5).
+
+Fig. (Ref) illustrates Top-1 test accuracy over 60 rounds on MNIST. While naive active RIS oscillates and plateaus at 92.4% (+/- 2.8%) due to error amplification, our framework suppresses noise, achieving 97.8% accuracy (+/- 0.4%) and matching the ideal noise-free trajectory with 3x faster convergence. On CIFAR-10 over 100 rounds, naive optimization reaches only 48.2%, whereas our controller achieves 62.1%, validating robustness on complex vision tasks.
+
+=== SECTION: Conclusion ===
+
+This work examined active-RIS-assisted Over-the-Air Federated Learning under imperfect CSI. We identified a fundamental vulnerability in conventional designs: naive instantaneous MSE minimization drives active amplification to its ceiling, amplifying thermal noise and compounding CSI estimation errors. To solve this, we formulated a convergence-aware framework derived from the conditional expectation of aggregation error, providing an exact regularization penalty that dynamically throttles amplification under uncertainty. Combining closed-form zero-forcing transceiver scaling with bound-constrained Quasi-Newton optimization delivers an efficient O(N^2) algorithmic solution. Physical-layer sweeps and PyTorch simulations on MNIST and CIFAR-10 confirmed that our framework prevents noise divergence, reduces aggregation MSE by up to 10x, and accelerates learning convergence across non-IID edge networks. Future work will investigate multi-antenna transceivers and discrete phase quantization.
